@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>필터 소리 실험실</title>
+<style>
+:root {
+  /* palette: navy ink, amber accent; one color per filter type, shared with the worksheet deck */
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --ink: #16203a;
+  --muted: #5b6b82;
+  --line: #d6dde8;
+  --accent: #e8930c;
+  --lpf: #d9820a;
+  --hpf: #1f8a80;
+  --bpf: #7a4fb3;
+  --bsf: #c0392b;
+  --plot-bg: #fbfcfe;
+  --grid: #e3e8f0;
+  --font-body: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", "Noto Sans CJK KR", system-ui, sans-serif;
+  /* layout: plot + transport on the left, source/presets/explanation on the right; stacks under 900px */
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1524; --surface: #18213a; --ink: #e8edf6; --muted: #9aa8bf; --line: #2c3a58;
+    --accent: #f2a531; --lpf: #f2a531; --hpf: #3cb8ab; --bpf: #a98ae0; --bsf: #ec6a5c;
+    --plot-bg: #121a2e; --grid: #243150; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1524; --surface: #18213a; --ink: #e8edf6; --muted: #9aa8bf; --line: #2c3a58;
+  --accent: #f2a531; --lpf: #f2a531; --hpf: #3cb8ab; --bpf: #a98ae0; --bsf: #ec6a5c;
+  --plot-bg: #121a2e; --grid: #243150; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 20px 40px; display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font-size: 26px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.panel h2 { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0; letter-spacing: 0.04em; }
+.plot-wrap { position: relative; }
+canvas#plot { width: 100%; height: 360px; display: block; border-radius: 8px; background: var(--plot-bg); border: 1px solid var(--line); touch-action: none; }
+@media (max-width: 600px) { canvas#plot { height: 260px; } }
+.readout { position: absolute; top: 10px; right: 12px; font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 18px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; background: var(--sw); }
+.transport { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 8px 14px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+#playBtn { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 700; min-width: 120px; }
+#playBtn.on { background: var(--accent); border-color: var(--accent); color: #1b1300; }
+#bypassBtn { font-weight: 700; }
+#bypassBtn.bypass { background: var(--line); }
+.status { font-size: 13px; color: var(--muted); }
+.types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 520px) { .types { grid-template-columns: repeat(2, 1fr); } }
+.types button { display: grid; gap: 0; text-align: left; padding: 10px 12px; border-width: 2px; }
+.types button b { font-size: 16px; }
+.types button small { color: var(--muted); }
+.types button[aria-pressed="true"] { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 12%, var(--surface)); }
+.types button[aria-pressed="true"] b { color: var(--tc); }
+.ctl { display: grid; grid-template-columns: 110px minmax(0, 1fr) 110px; gap: 10px; align-items: center; }
+@media (max-width: 520px) { .ctl { grid-template-columns: 90px minmax(0, 1fr) 92px; } }
+.ctl label { font-weight: 700; font-size: 14px; }
+.ctl output { font-variant-numeric: tabular-nums; text-align: right; font-weight: 700; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { padding: 6px 12px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg button:disabled, input:disabled { opacity: 0.4; cursor: not-allowed; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.sources { display: grid; gap: 8px; }
+.sources button { text-align: left; display: grid; padding: 10px 12px; }
+.sources button small { color: var(--muted); }
+.sources button[aria-pressed="true"] { border: 2px solid var(--accent); padding: 9px 11px; }
+#sineRow[hidden] { display: none; }
+.drop { border: 2px dashed var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--muted); }
+.drop.over { border-color: var(--accent); color: var(--ink); }
+.drop input { font: inherit; font-size: 13px; max-width: 100%; }
+.lib { display: grid; gap: 6px; }
+.lib button { text-align: left; display: grid; padding: 8px 12px; }
+.lib button small { color: var(--muted); }
+.lib button[aria-pressed="true"] { border: 2px solid var(--accent); padding: 7px 11px; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.presets button { font-size: 14px; padding: 6px 12px; border-radius: 999px; }
+.explain { border-radius: 10px; padding: 14px; background: color-mix(in srgb, var(--tc) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--tc) 35%, var(--line)); display: grid; gap: 8px; }
+.explain h3 { margin: 0; font-size: 17px; color: var(--tc); }
+.explain p { margin: 0; }
+.explain dl { margin: 0; display: grid; grid-template-columns: 74px 1fr; gap: 4px 8px; font-size: 14px; }
+.explain dt { font-weight: 700; color: var(--muted); }
+.explain dd { margin: 0; }
+.spec { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 700; }
+.keys { font-size: 13px; color: var(--muted); }
+kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>필터 소리 실험실</h1>
+    <p>저역·고역·대역통과·대역저지 필터를 귀로 듣고 주파수 응답과 함께 보기</p>
+  </header>
+
+  <div class="grid">
+    <main class="panel" aria-label="필터와 그래프">
+      <div class="transport">
+        <button id="playBtn" type="button">▶ 재생</button>
+        <button id="bypassBtn" type="button" aria-pressed="false" title="단축키 B">필터 켜짐 · 원음과 비교</button>
+        <span class="status" id="status">재생 버튼을 누르면 소리가 납니다. 아이폰·아이패드는 무음 스위치를 꺼 주세요.</span>
+      </div>
+
+      <div class="plot-wrap">
+        <canvas id="plot" aria-label="필터 주파수 응답과 실시간 스펙트럼 그래프" role="img"></canvas>
+        <div class="readout" id="readout">그래프 위에 마우스를 올려 보세요</div>
+      </div>
+      <div class="legend">
+        <span id="lgResp" style="--sw: var(--lpf)">필터 주파수 응답 (왼쪽 dB 축)</span>
+        <span style="--sw: var(--muted)">입력 스펙트럼</span>
+        <span id="lgOut" style="--sw: var(--lpf)">출력 스펙트럼 (재생 중)</span>
+        <span style="--sw: var(--line)">−3 dB 선</span>
+      </div>
+
+      <div class="types" role="group" aria-label="필터 종류">
+        <button type="button" data-type="lowpass" style="--tc: var(--lpf)" title="단축키 1"><b>저역통과</b><small>LPF · 낮은 소리 통과</small></button>
+        <button type="button" data-type="highpass" style="--tc: var(--hpf)" title="단축키 2"><b>고역통과</b><small>HPF · 높은 소리 통과</small></button>
+        <button type="button" data-type="bandpass" style="--tc: var(--bpf)" title="단축키 3"><b>대역통과</b><small>BPF · 가운데만 통과</small></button>
+        <button type="button" data-type="notch" style="--tc: var(--bsf)" title="단축키 4"><b>대역저지</b><small>BSF · 가운데만 제거</small></button>
+      </div>
+
+      <div class="ctl">
+        <label for="freq" id="freqLabel">차단주파수</label>
+        <input id="freq" type="range" min="0" max="1000" step="1">
+        <output id="freqOut" for="freq"></output>
+      </div>
+      <div class="ctl">
+        <label>필터 차수</label>
+        <div class="seg" role="group" aria-label="필터 차수" id="order">
+          <button type="button" data-o="1" aria-pressed="true" title="단축키 R">1차 RC</button>
+          <button type="button" data-o="2" aria-pressed="false" title="단축키 R">2차</button>
+        </div>
+        <output id="orderOut"></output>
+      </div>
+      <div class="ctl">
+        <label for="q">Q (선택도)</label>
+        <input id="q" type="range" min="0" max="1000" step="1">
+        <output id="qOut" for="q"></output>
+      </div>
+      <div class="ctl">
+        <label>필터 단 수</label>
+        <div class="seg" role="group" aria-label="필터 단 수" id="stages">
+          <button type="button" data-n="1" aria-pressed="true">1단</button>
+          <button type="button" data-n="2" aria-pressed="false">2단</button>
+          <button type="button" data-n="4" aria-pressed="false">4단</button>
+        </div>
+        <output id="slopeOut"></output>
+      </div>
+      <div class="ctl">
+        <label for="vol">음량</label>
+        <input id="vol" type="range" min="0" max="100" step="1" value="60">
+        <output id="volOut" for="vol">60%</output>
+      </div>
+      <p class="hint" id="orderHint"></p>
+      <p class="keys">단축키: <kbd>Space</kbd> 재생/정지 · <kbd>B</kbd> 원음 비교 · <kbd>1</kbd>~<kbd>4</kbd> 필터 종류 · <kbd>R</kbd> 1차/2차 전환</p>
+    </main>
+
+    <aside class="panel" aria-label="음원, 예시, 설명">
+      <h2>음원</h2>
+      <div class="sources" role="group" aria-label="음원 선택">
+        <button type="button" data-src="music" aria-pressed="true"><b>내장 음악</b><small>베이스·드럼·화음이 고르게 들어 있는 4마디 반복</small></button>
+        <button type="button" data-src="noise" aria-pressed="false"><b>화이트 노이즈</b><small>모든 주파수가 같은 세기 · 응답 모양이 잘 들림</small></button>
+        <button type="button" data-src="sine" aria-pressed="false"><b>사인파 (단일 주파수)</b><small>20 Hz ~ 20 kHz 한 주파수만 · 통과/차단을 소리 크기로 확인</small></button>
+        <button type="button" data-src="file" aria-pressed="false"><b>내 음원 파일</b><small id="fileName">아래에서 MP3·WAV 파일을 고르세요</small></button>
+      </div>
+      <div class="ctl" id="sineRow" hidden>
+        <label for="sineF">사인파</label>
+        <input id="sineF" type="range" min="0" max="1000" step="1">
+        <output id="sineOut" for="sineF"></output>
+      </div>
+      <p class="hint" id="sineHint" hidden>노트북 스피커는 약 100 Hz 아래가 거의 들리지 않고, 사람 귀도 15 kHz 위는 잘 듣지 못합니다(나이에 따라 다름). 양 끝 주파수에서 소리가 안 들리면 필터가 아니라 스피커나 귀의 한계일 수 있으니, 그래프의 출력 스펙트럼으로 확인하세요. 높은 주파수는 귀에 거슬릴 수 있으니 음량을 낮춰 시작하세요.</p>
+      <div class="drop" id="drop">
+        <label for="fileIn">음원 파일 (여기에 끌어다 놓아도 됩니다) · 파일은 이 브라우저 안에서만 쓰이고 어디에도 올라가지 않습니다</label><br>
+        <input id="fileIn" type="file" accept="audio/*">
+      </div>
+
+      <h2 id="libTitle">수업 음원</h2>
+      <div class="lib" id="lib" role="group" aria-labelledby="libTitle">
+        <p class="hint" id="libHint">목록을 확인하는 중…</p>
+      </div>
+
+      <h2>들어 볼 예시</h2>
+      <div class="presets" id="presets">
+        <button type="button" data-p="rc">활동지 1차 RC (1,592 Hz)</button>
+        <button type="button" data-p="rc2">RC 두 단 (버퍼 분리)</button>
+        <button type="button" data-p="wall">벽 너머 음악</button>
+        <button type="button" data-p="thin">저음 뺀 라디오</button>
+        <button type="button" data-p="phone">전화기 목소리</button>
+        <button type="button" data-p="whistle">노이즈가 음으로</button>
+        <button type="button" data-p="erase">1 kHz 소리 지우기</button>
+      </div>
+
+      <div class="explain" id="explain" style="--tc: var(--lpf)">
+        <h3 id="exTitle"></h3>
+        <p id="exBody"></p>
+        <div class="spec" id="exSpec"></div>
+        <dl>
+          <dt>들어 볼 것</dt><dd id="exListen"></dd>
+          <dt>쓰이는 곳</dt><dd id="exUse"></dd>
+        </dl>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  // ---------- mapping helpers ----------
+  const logMap = (v, lo, hi) => lo * Math.pow(hi / lo, v / 1000);
+  const logInv = (x, lo, hi) => Math.round(1000 * Math.log(x / lo) / Math.log(hi / lo));
+  const F_LO = 20, F_HI = 20000, Q_LO = 0.3, Q_HI = 20, S_LO = 20, S_HI = 20000;
+  const fmtHz = (f) => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2).replace(/\.?0+$/, "") + " kHz" : Math.round(f).toLocaleString("ko-KR") + " Hz";
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- state ----------
+  const state = { type: "lowpass", freq: 1592, q: 0.707, order: 1, stages: 1, vol: 0.6, src: "music", sineF: 1000, bypass: false, playing: false };
+
+  const TYPES = {
+    lowpass: { name: "저역통과 필터 (LPF)", color: "--lpf", fLabel: "차단주파수",
+      body: "차단주파수보다 낮은 소리는 통과시키고 높은 소리는 줄입니다.",
+      listen: "차단주파수를 내릴수록 소리가 먹먹해집니다. 하이햇과 심벌처럼 높은 소리가 먼저 사라집니다.",
+      use: "스피커 우퍼, 센서 잡음 제거, ADC 앞 안티앨리어싱 필터" },
+    highpass: { name: "고역통과 필터 (HPF)", color: "--hpf", fLabel: "차단주파수",
+      body: "차단주파수보다 높은 소리는 통과시키고 낮은 소리는 줄입니다.",
+      listen: "차단주파수를 올릴수록 베이스와 킥 드럼이 사라지고 소리가 얇아집니다.",
+      use: "스피커 트위터, 마이크 바람 소리 제거, 직류 성분 차단(커플링 커패시터)" },
+    bandpass: { name: "대역통과 필터 (BPF)", color: "--bpf", fLabel: "중심주파수",
+      body: "중심주파수 근처의 소리만 통과시킵니다. Q가 클수록 통과 대역이 좁아집니다.",
+      listen: "화이트 노이즈에서 Q를 키우면 '쉬익' 소리가 휘파람 같은 음으로 바뀝니다.",
+      use: "라디오 동조 회로, 전화 음성 대역(약 300~3,400 Hz), 스펙트럼 분석기" },
+    notch: { name: "대역저지 필터 (BSF)", color: "--bsf", fLabel: "중심주파수",
+      body: "중심주파수 근처의 소리만 없애고 나머지는 통과시킵니다. 폭이 좁으면 노치 필터라고 부릅니다.",
+      listen: "사인파를 중심주파수에 맞추면 소리가 거의 사라집니다. 음악에서는 차이가 작게 들립니다.",
+      use: "60 Hz 전원 험 제거, 공연장 하울링 제거, Twin-T 필터" },
+  };
+
+  // ---------- design-time filter (works before audio starts) ----------
+  const designCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 48000);
+  const designBq = designCtx.createBiquadFilter();
+  // Web Audio uses Q in dB for lowpass/highpass and linear Q for bandpass/notch.
+  const qParam = (type, q) => (type === "lowpass" || type === "highpass") ? 20 * Math.log10(q) : q;
+
+  const isLH = () => state.type === "lowpass" || state.type === "highpass";
+  const isRC = () => state.order === 1 && isLH();
+  // ideal first-order RC magnitude, the same formula as the worksheet
+  const rcDb = (f) => { const x = f / state.freq; const m = state.type === "lowpass" ? 1 / Math.sqrt(1 + x * x) : x / Math.sqrt(1 + x * x); return 20 * Math.log10(Math.max(m, 1e-9)); };
+  // bilinear transform with prewarping, so the digital filter is exactly -3 dB at fc
+  function rcCoefs(sr) {
+    const K = Math.tan(Math.PI * Math.min(state.freq, sr * 0.45) / sr), a1 = (K - 1) / (K + 1);
+    return state.type === "lowpass" ? { ff: [K / (1 + K), K / (1 + K)], fb: [1, a1] } : { ff: [1 / (1 + K), -1 / (1 + K)], fb: [1, a1] };
+  }
+  const N_PTS = 400;
+  const freqs = new Float32Array(N_PTS);
+  for (let i = 0; i < N_PTS; i++) freqs[i] = F_LO * Math.pow(F_HI / F_LO, i / (N_PTS - 1));
+  const mag = new Float32Array(N_PTS), ph = new Float32Array(N_PTS);
+  function responseDb() {
+    if (isRC()) { const out = new Float32Array(N_PTS); for (let i = 0; i < N_PTS; i++) out[i] = rcDb(freqs[i]) * state.stages; return out; }
+    designBq.type = state.type;
+    designBq.frequency.value = state.freq;
+    designBq.Q.value = qParam(state.type, state.q);
+    designBq.getFrequencyResponse(freqs, mag, ph);
+    const out = new Float32Array(N_PTS);
+    for (let i = 0; i < N_PTS; i++) out[i] = 20 * Math.log10(Math.max(mag[i], 1e-9)) * state.stages;
+    return out;
+  }
+  function gainAt(f) {
+    if (isRC()) return rcDb(f) * state.stages;
+    designBq.type = state.type; designBq.frequency.value = state.freq; designBq.Q.value = qParam(state.type, state.q);
+    const one = new Float32Array([f]), m = new Float32Array(1), p = new Float32Array(1);
+    designBq.getFrequencyResponse(one, m, p);
+    return 20 * Math.log10(Math.max(m[0], 1e-9)) * state.stages;
+  }
+
+  // ---------- audio ----------
+  let builtFor = "", rebuildPending = false;
+  // IIR coefficients are fixed at creation, so first-order RC chains are rebuilt when fc changes
+  const chainKey = () => isRC() ? `rc|${state.type}|${state.freq.toFixed(2)}|${state.stages}` : `bq|${state.stages}`;
+  function scheduleRebuild() {
+    if (rebuildPending) return; rebuildPending = true;
+    requestAnimationFrame(() => { rebuildPending = false; if (ctx && builtFor !== chainKey()) rebuildChain(); });
+  }
+  let ctx = null, bus, chain = [], wet, dry, master, inAn, outAn, srcNode = null;
+  const buffers = {};
+  function ensureCtx() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    bus = ctx.createGain();
+    wet = ctx.createGain(); dry = ctx.createGain(); master = ctx.createGain();
+    inAn = ctx.createAnalyser(); outAn = ctx.createAnalyser();
+    [inAn, outAn].forEach((a) => { a.fftSize = 8192; a.smoothingTimeConstant = 0.82; });
+    wet.connect(master); dry.connect(master); master.connect(outAn); outAn.connect(ctx.destination);
+    buffers.noise = makeNoise(ctx);
+    rebuildChain(); applyParams(true);
+  }
+  function rebuildChain() {
+    if (!ctx) return;
+    bus.disconnect(); chain.forEach((b) => b.disconnect());
+    chain = [];
+    for (let i = 0; i < state.stages; i++) {
+      if (isRC()) { const c = rcCoefs(ctx.sampleRate); chain.push(ctx.createIIRFilter(c.ff, c.fb)); }
+      else chain.push(ctx.createBiquadFilter());
+    }
+    builtFor = chainKey();
+    bus.connect(inAn); bus.connect(dry); bus.connect(chain[0]);
+    for (let i = 0; i < chain.length - 1; i++) chain[i].connect(chain[i + 1]);
+    chain[chain.length - 1].connect(wet);
+    applyParams(true);
+  }
+  function applyParams(instant) {
+    if (!ctx) return;
+    const t = ctx.currentTime, tc = instant ? 0.001 : 0.03;
+    if (builtFor !== chainKey()) scheduleRebuild();
+    if (!isRC()) chain.forEach((b) => {
+      if (!b.frequency) return;
+      b.type = state.type;
+      b.frequency.setTargetAtTime(state.freq, t, tc);
+      b.Q.setTargetAtTime(qParam(state.type, state.q), t, tc);
+    });
+    wet.gain.setTargetAtTime(state.bypass ? 0 : 1, t, 0.02);
+    dry.gain.setTargetAtTime(state.bypass ? 1 : 0, t, 0.02);
+    master.gain.setTargetAtTime(state.vol, t, 0.03);
+    if (srcNode && srcNode.frequency) srcNode.frequency.setTargetAtTime(state.sineF, t, 0.02);
+  }
+  function makeNoise(c) {
+    const len = c.sampleRate * 4, b = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = b.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * 0.5; }
+    return b;
+  }
+  // Built-in 4-bar loop: Am - F - C - G at 100 BPM, rendered offline once.
+  async function makeMusic() {
+    const sr = 44100, beat = 0.6, bars = 4, dur = beat * 4 * bars;
+    const oc = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, Math.ceil(sr * dur), sr);
+    const out = oc.createGain(); out.gain.value = 0.9; out.connect(oc.destination);
+    const nb = oc.createBuffer(1, sr, sr); const nd = nb.getChannelData(0); for (let i = 0; i < sr; i++) nd[i] = Math.random() * 2 - 1;
+    const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+    const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // Am F C G (pad, octave 3-4)
+    const roots = [33, 29, 36, 31]; // A1 F1 C2 G1
+    const mel = [76, 74, 72, 74, 76, 76, 76, null, 74, 74, 74, null, 76, 79, 79, null];
+    const note = (type, f, t0, d, g, dest) => {
+      const o = oc.createOscillator(), e = oc.createGain(); o.type = type; o.frequency.value = f;
+      e.gain.setValueAtTime(0, t0); e.gain.linearRampToValueAtTime(g, t0 + 0.01); e.gain.setTargetAtTime(0, t0 + d * 0.7, d * 0.15);
+      o.connect(e); e.connect(dest || out); o.start(t0); o.stop(t0 + d + 0.3);
+    };
+    const noiseHit = (t0, d, g, ftype, ff, q) => {
+      const s = oc.createBufferSource(), f = oc.createBiquadFilter(), e = oc.createGain();
+      s.buffer = nb; f.type = ftype; f.frequency.value = ff; f.Q.value = q || 0.7;
+      e.gain.setValueAtTime(g, t0); e.gain.exponentialRampToValueAtTime(0.001, t0 + d);
+      s.connect(f); f.connect(e); e.connect(out); s.start(t0, Math.random() * 0.5); s.stop(t0 + d + 0.05);
+    };
+    for (let bar = 0; bar < bars; bar++) {
+      const tb = bar * beat * 4;
+      chords[bar].forEach((m) => note("triangle", hz(m), tb, beat * 4 - 0.05, 0.07));
+      for (let k = 0; k < 8; k++) {
+        const t = tb + k * beat / 2;
+        note("sawtooth", hz(roots[bar] + (k % 4 === 3 ? 12 : 0)), t, beat / 2 - 0.04, 0.16);
+        noiseHit(t, 0.05, k % 2 ? 0.12 : 0.2, "highpass", 7000);
+      }
+      for (let k = 0; k < 4; k++) {
+        const t = tb + k * beat;
+        if (k % 2 === 0) { // kick
+          const o = oc.createOscillator(), e = oc.createGain();
+          o.frequency.setValueAtTime(130, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.15);
+          e.gain.setValueAtTime(0.9, t); e.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+          o.connect(e); e.connect(out); o.start(t); o.stop(t + 0.4);
+        } else noiseHit(t, 0.18, 0.35, "bandpass", 1800, 0.8); // snare
+      }
+      for (let k = 0; k < 4; k++) { const m = mel[bar * 4 + k]; if (m) note("square", hz(m), tb + k * beat, beat * 0.9, 0.045); }
+    }
+    return await oc.startRendering();
+  }
+  const musicReady = makeMusic().then((b) => { buffers.music = b; }).catch(() => {});
+
+  function stopSource() {
+    if (srcNode) { try { srcNode.stop(); } catch (e) {} srcNode.disconnect(); srcNode = null; }
+  }
+  async function startSource() {
+    stopSource();
+    if (state.src === "sine") {
+      const o = ctx.createOscillator(); o.type = "sine"; o.frequency.value = state.sineF;
+      const g = ctx.createGain(); g.gain.value = 0.5; o.connect(g); g.connect(bus);
+      o.start(); srcNode = o; srcNode._g = g;
+      const origDisc = o.disconnect.bind(o); o.disconnect = () => { origDisc(); g.disconnect(); };
+      return true;
+    }
+    if (state.src === "music" && !buffers.music) await musicReady;
+    const buf = buffers[state.src];
+    if (!buf) { setStatus(state.src === "file" ? "먼저 음원 파일을 골라 주세요." : "음원을 준비하지 못했습니다. 다른 음원을 골라 주세요."); return false; }
+    const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true; s.connect(bus); s.start(); srcNode = s;
+    return true;
+  }
+  async function play() {
+    try {
+      ensureCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      const ok = await startSource();
+      if (!ok) return;
+      state.playing = true; render();
+      setStatus("재생 중 · 필터를 바꾸며 소리를 비교해 보세요.");
+      loop();
+    } catch (e) { setStatus("소리를 재생하지 못했습니다. 브라우저의 소리 권한과 음량을 확인해 주세요."); }
+  }
+  function stop() { stopSource(); state.playing = false; render(); setStatus("정지됨"); }
+  const setStatus = (t) => { $("status").textContent = t; };
+
+  // ---------- file loading ----------
+  async function loadFile(file) {
+    if (!file) return;
+    $("fileName").textContent = "불러오는 중: " + file.name;
+    try {
+      ensureCtx();
+      const ab = await file.arrayBuffer();
+      buffers.file = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+      $("fileName").textContent = file.name;
+      selectSource("file");
+      if (state.playing) startSource();
+    } catch (e) {
+      $("fileName").textContent = "이 파일은 열 수 없습니다. MP3나 WAV 파일을 골라 주세요.";
+    }
+  }
+  $("fileIn").addEventListener("change", (e) => loadFile(e.target.files[0]));
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", (e) => loadFile(e.dataTransfer.files[0]));
+
+  // ---------- class library (sounds.json next to this page) ----------
+  let lib = [], libCur = -1;
+  const libCache = {};
+  async function loadLibrary() {
+    const hint = $("libHint");
+    try {
+      const r = await fetch("sounds.json", { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const j = await r.json();
+      lib = Array.isArray(j) ? j : (j.sounds || []);
+      if (j.title) $("libTitle").textContent = j.title;
+      if (!lib.length) throw new Error("empty");
+      hint.remove();
+      lib.forEach((it, i) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.setAttribute("aria-pressed", "false"); b.dataset.i = i;
+        const bt = document.createElement("b"); bt.textContent = it.title || it.file;
+        b.appendChild(bt);
+        if (it.preset) { const sm = document.createElement("small"); sm.textContent = "추천 필터: " + presetLabel(it.preset); b.appendChild(sm); }
+        b.addEventListener("click", () => pickLib(i));
+        $("lib").appendChild(b);
+      });
+    } catch (e) {
+      hint.textContent = location.protocol === "file:"
+        ? "파일을 더블클릭해 열면 수업 음원 목록이 나타나지 않습니다. NAS나 웹 서버에 sounds.json, sounds 폴더와 함께 올리면 여기에 목록이 생깁니다."
+        : "이 페이지와 같은 폴더에 sounds.json을 두면 수업 음원 목록이 여기에 나타납니다.";
+    }
+  }
+  function presetLabel(p) {
+    const n = { lowpass: "저역통과", highpass: "고역통과", bandpass: "대역통과", notch: "대역저지" }[p.type] || p.type;
+    const o = p.order === 1 && (p.type === "lowpass" || p.type === "highpass") ? "1차 RC" : "2차";
+    return `${n} ${fmtHz(p.freq)} · ${o}${p.stages > 1 ? " · " + p.stages + "단" : ""}`;
+  }
+  async function pickLib(i) {
+    const it = lib[i];
+    try {
+      ensureCtx();
+      if (ctx.state === "suspended") await ctx.resume();
+      setStatus("불러오는 중: " + (it.title || it.file));
+      if (!libCache[it.file]) {
+        const r = await fetch(it.file);
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const ab = await r.arrayBuffer();
+        libCache[it.file] = await new Promise((res, rej) => { const pr = ctx.decodeAudioData(ab, res, rej); if (pr && pr.then) pr.then(res, rej); });
+      }
+      buffers.lib = libCache[it.file]; libCur = i;
+      if (it.preset) {
+        const p = it.preset;
+        Object.assign(state, { type: p.type || state.type, freq: +p.freq || state.freq, q: +p.q || state.q, order: p.order === 1 ? 1 : 2, stages: [1, 2, 4].includes(+p.stages) ? +p.stages : 1, bypass: false });
+        if (!isLH()) state.order = 2;
+      }
+      state.src = "lib"; rebuildChain(); render();
+      await play();
+      if (it.note) setStatus(it.note);
+    } catch (e) {
+      setStatus(`"${it.file}" 파일을 열지 못했습니다. 파일 이름과 위치(sounds 폴더), NAS의 읽기 권한을 확인해 주세요.`);
+    }
+  }
+
+  // ---------- UI wiring ----------
+  function selectSource(src) {
+    state.src = src; render();
+    if (state.playing) startSource();
+  }
+  document.querySelectorAll(".sources button").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.src === "file" && !buffers.file) { $("fileIn").click(); return; }
+    selectSource(b.dataset.src);
+  }));
+  document.querySelectorAll(".types button").forEach((b) => b.addEventListener("click", () => setType(b.dataset.type)));
+  function setType(t) {
+    if (state.type === t) return;
+    const wasLH = state.type === "lowpass" || state.type === "highpass";
+    const isLH = t === "lowpass" || t === "highpass";
+    state.type = t;
+    if (wasLH !== isLH) state.q = isLH ? 0.707 : 2;
+    if (!isLH) state.order = 2;
+    if (ctx) rebuildChain(); render();
+  }
+  document.querySelectorAll("#stages button").forEach((b) => b.addEventListener("click", () => { state.stages = +b.dataset.n; rebuildChain(); render(); }));
+  function setOrder(o) {
+    if (o === 1 && !isLH()) return;
+    state.order = o; if (o === 2) state.q = 0.707;
+    if (ctx) rebuildChain(); render();
+  }
+  document.querySelectorAll("#order button").forEach((b) => b.addEventListener("click", () => setOrder(+b.dataset.o)));
+  $("freq").addEventListener("input", (e) => { state.freq = logMap(+e.target.value, F_LO, F_HI); applyParams(); render(); });
+  $("q").addEventListener("input", (e) => { state.q = logMap(+e.target.value, Q_LO, Q_HI); applyParams(); render(); });
+  $("sineF").addEventListener("input", (e) => { state.sineF = logMap(+e.target.value, S_LO, S_HI); applyParams(); render(); });
+  $("vol").addEventListener("input", (e) => { state.vol = +e.target.value / 100; applyParams(); render(); });
+  $("playBtn").addEventListener("click", () => state.playing ? stop() : play());
+  $("bypassBtn").addEventListener("click", () => { state.bypass = !state.bypass; applyParams(); render(); });
+
+  const PRESETS = {
+    rc:      { type: "lowpass", freq: 1592, q: 0.707, order: 1, stages: 1, src: "noise", msg: "활동지 활동 1과 같은 1차 RC 저역통과 필터(R = 1 kΩ, C = 100 nF)입니다. 원음 비교 버튼으로 차이를 들어 보세요." },
+    rc2:     { type: "lowpass", freq: 1592, q: 0.707, order: 1, stages: 2, src: "noise", msg: "1차 RC 필터 두 단(버퍼로 분리)입니다. 1단과 번갈아 들으며 기울기 차이를 비교해 보세요." },
+    wall:    { type: "lowpass", freq: 300, q: 0.707, order: 2, stages: 2, src: "music", msg: "벽은 높은 소리를 더 많이 흡수합니다. 옆집 음악이 '쿵쿵'만 들리는 이유입니다." },
+    thin:    { type: "highpass", freq: 900, q: 0.707, order: 2, stages: 2, src: "music", msg: "베이스와 킥 드럼이 빠져 작은 라디오 스피커 소리처럼 들립니다." },
+    phone:   { type: "bandpass", freq: 1010, q: 0.33, order: 2, stages: 2, src: "music", msg: "전화는 약 300~3,400 Hz만 전달합니다. 중심 약 1 kHz, Q ≈ 0.33으로 흉내 낸 소리입니다." },
+    whistle: { type: "bandpass", freq: 1200, q: 15, order: 2, stages: 1, src: "noise", msg: "Q를 크게 하면 좁은 대역만 남아 노이즈가 음높이를 가진 소리로 바뀝니다. 주파수 슬라이더를 움직여 보세요." },
+    erase:   { type: "notch", freq: 1000, q: 2, order: 2, stages: 1, src: "sine", sineF: 1000, msg: "1 kHz 사인파가 거의 들리지 않습니다. 사인파 주파수를 조금씩 바꾸면 다시 들립니다." },
+  };
+  document.querySelectorAll("#presets button").forEach((b) => b.addEventListener("click", () => {
+    const p = PRESETS[b.dataset.p];
+    Object.assign(state, { type: p.type, freq: p.freq, q: p.q, order: p.order, stages: p.stages, bypass: false });
+    if (p.sineF) state.sineF = p.sineF;
+    const srcChanged = state.src !== p.src; state.src = p.src;
+    if (ctx) rebuildChain();
+    render();
+    if (state.playing) { if (srcChanged || p.src === "sine") startSource(); setStatus(p.msg); }
+    else play().then(() => setStatus(p.msg));
+  }));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+    if (e.code === "Space") { e.preventDefault(); state.playing ? stop() : play(); }
+    else if (e.key === "b" || e.key === "B") { state.bypass = !state.bypass; applyParams(); render(); }
+    else if (e.key === "r" || e.key === "R") setOrder(state.order === 1 ? 2 : 1);
+    else if ("1234".includes(e.key) && e.key.length === 1) setType(["lowpass", "highpass", "bandpass", "notch"][+e.key - 1]);
+  });
+
+  // ---------- render controls ----------
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  function render() {
+    const T = TYPES[state.type];
+    document.querySelectorAll(".types button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.type === state.type)));
+    document.querySelectorAll(".sources button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === state.src)));
+    document.querySelectorAll("#lib button").forEach((b) => b.setAttribute("aria-pressed", String(state.src === "lib" && +b.dataset.i === libCur)));
+    document.querySelectorAll("#stages button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.n === state.stages)));
+    $("freq").value = logInv(state.freq, F_LO, F_HI); $("freqOut").textContent = fmtHz(state.freq); $("freqLabel").textContent = T.fLabel;
+    $("q").value = logInv(state.q, Q_LO, Q_HI); $("qOut").textContent = state.q.toFixed(state.q < 10 ? 2 : 1);
+    $("sineF").value = logInv(state.sineF, S_LO, S_HI); $("sineOut").textContent = fmtHz(state.sineF);
+    $("volOut").textContent = Math.round(state.vol * 100) + "%"; $("vol").value = Math.round(state.vol * 100);
+    $("sineRow").hidden = state.src !== "sine"; $("sineHint").hidden = state.src !== "sine";
+    const lh = isLH(), rc = isRC();
+    document.querySelectorAll("#order button").forEach((b) => { b.setAttribute("aria-pressed", String(+b.dataset.o === state.order)); b.disabled = +b.dataset.o === 1 && !lh; });
+    $("q").disabled = rc; if (rc) $("qOut").textContent = "—";
+    const dec = (rc ? 20 : 40) * state.stages;
+    $("orderOut").textContent = lh ? (rc ? "−20 dB/dec" : "−40 dB/dec") : "2차";
+    $("slopeOut").textContent = lh ? "−" + dec + " dB/dec" : state.stages + "단";
+    $("orderHint").textContent = !lh ? "대역통과·대역저지는 2차 필터로만 제공합니다. 활동 4의 직렬 RLC 회로도 2차 필터입니다."
+      : rc ? "1차 RC: 활동지와 같은 식 |H| = 1/√(1+(f/f꜀)²)입니다. Q는 쓰지 않습니다. 여러 단은 각 단을 버퍼로 분리한 경우이며, 버퍼 없이 연결한 활동 5와는 다릅니다."
+      : "2차: Q = 0.707이면 버터워스 특성으로 f꜀에서 −3 dB입니다. Q를 키우면 f꜀ 근처가 솟아오르는 공진이 생깁니다.";
+    $("playBtn").textContent = state.playing ? "■ 정지" : "▶ 재생"; $("playBtn").classList.toggle("on", state.playing);
+    $("bypassBtn").textContent = state.bypass ? "원음 듣는 중 · 필터 다시 켜기" : "필터 켜짐 · 원음과 비교";
+    $("bypassBtn").classList.toggle("bypass", state.bypass); $("bypassBtn").setAttribute("aria-pressed", String(state.bypass));
+    const ex = $("explain"); ex.style.setProperty("--tc", `var(${T.color})`);
+    $("lgResp").style.setProperty("--sw", `var(${T.color})`); $("lgOut").style.setProperty("--sw", `var(${T.color})`);
+    $("exTitle").textContent = T.name; $("exBody").textContent = T.body; $("exListen").textContent = T.listen; $("exUse").textContent = T.use;
+    let spec;
+    if (lh) {
+      const g = gainAt(state.freq);
+      spec = `${T.fLabel} ${fmtHz(state.freq)}에서 ${g.toFixed(1)} dB · 기울기 −${dec} dB/decade (≈ −${Math.round(dec * 0.30103)} dB/옥타브)`;
+      if (rc) { const R = 1 / (2 * Math.PI * state.freq * 100e-9); spec += ` · C = 100 nF이면 R ≈ ${R >= 995 ? (R / 1000).toFixed(2) + " kΩ" : Math.round(R) + " Ω"}`; }
+    } else {
+      const k = 1 / (2 * state.q), r = Math.sqrt(1 + k * k);
+      const lo = state.freq * (r - k), hi = state.freq * (r + k);
+      spec = `${state.type === "bandpass" ? "통과" : "제거"} 대역(1단, −3 dB 기준) 약 ${fmtHz(lo)} ~ ${fmtHz(hi)} · 대역폭 BW = f₀/Q ≈ ${fmtHz(state.freq / state.q)}`;
+    }
+    $("exSpec").textContent = spec;
+    draw();
+  }
+
+  // ---------- plot ----------
+  const cv = $("plot"), g2 = cv.getContext("2d");
+  const DB_TOP = 20, DB_BOT = -60, SP_TOP = -15, SP_BOT = -110;
+  let hoverF = null, specIn = null, specOut = null;
+  function geom() {
+    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    g2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const L = 46, R = 12, T = 12, B = 30;
+    return { w, h, L, R, T, B, pw: w - L - R, ph: h - T - B };
+  }
+  const xOf = (G, f) => G.L + G.pw * Math.log(f / F_LO) / Math.log(F_HI / F_LO);
+  const fOf = (G, x) => F_LO * Math.pow(F_HI / F_LO, (x - G.L) / G.pw);
+  const yDb = (G, d) => G.T + G.ph * (DB_TOP - Math.max(DB_BOT, Math.min(DB_TOP, d))) / (DB_TOP - DB_BOT);
+  const ySp = (G, d) => G.T + G.ph * (SP_TOP - Math.max(SP_BOT, Math.min(SP_TOP, d))) / (SP_TOP - SP_BOT);
+  function specPath(G, data, sr) {
+    const binHz = sr / 2 / data.length;
+    g2.beginPath();
+    for (let px = 0; px <= G.pw; px += 2) {
+      const f0 = fOf(G, G.L + px), f1 = fOf(G, G.L + px + 2);
+      let i0 = Math.max(1, Math.floor(f0 / binHz)), i1 = Math.max(i0, Math.floor(f1 / binHz));
+      let m = -200; for (let i = i0; i <= i1 && i < data.length; i++) m = Math.max(m, data[i]);
+      const y = ySp(G, m);
+      px === 0 ? g2.moveTo(G.L + px, y) : g2.lineTo(G.L + px, y);
+    }
+  }
+  function draw() {
+    const G = geom(), col = css(TYPES[state.type].color), muted = css("--muted"), grid = css("--grid"), ink = css("--ink"), line = css("--line");
+    g2.clearRect(0, 0, G.w, G.h);
+    g2.font = "11px " + css("--font-body"); g2.fillStyle = muted; g2.lineWidth = 1;
+    // grid
+    [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000].forEach((f) => {
+      const x = xOf(G, f); g2.strokeStyle = grid; g2.beginPath(); g2.moveTo(x, G.T); g2.lineTo(x, G.T + G.ph); g2.stroke();
+      g2.textAlign = f === 20000 ? "right" : f === 20 ? "left" : "center";
+      g2.fillText(f === 20000 ? "20 kHz" : f === 20 ? "20 Hz" : f >= 1000 ? f / 1000 + "k" : String(f), x, G.h - 12);
+    });
+    g2.textAlign = "right";
+    for (let d = DB_TOP; d >= DB_BOT; d -= 20) {
+      const y = yDb(G, d); g2.strokeStyle = grid; g2.beginPath(); g2.moveTo(G.L, y); g2.lineTo(G.L + G.pw, y); g2.stroke();
+      g2.fillText(d + " dB", G.L - 6, y + 4);
+    }
+    // -3 dB guide
+    g2.setLineDash([5, 4]); g2.strokeStyle = line; g2.lineWidth = 1.5;
+    const y3 = yDb(G, -3); g2.beginPath(); g2.moveTo(G.L, y3); g2.lineTo(G.L + G.pw, y3); g2.stroke();
+    g2.setLineDash([]);
+    // spectra
+    if (state.playing && specIn) {
+      const sr = ctx.sampleRate;
+      specPath(G, specIn, sr); g2.strokeStyle = muted; g2.globalAlpha = 0.55; g2.lineWidth = 1; g2.stroke(); g2.globalAlpha = 1;
+      specPath(G, specOut, sr); g2.lineTo(G.L + G.pw, G.T + G.ph); g2.lineTo(G.L, G.T + G.ph); g2.closePath();
+      g2.fillStyle = col; g2.globalAlpha = state.bypass ? 0.12 : 0.22; g2.fill(); g2.globalAlpha = 1;
+    }
+    // response curve
+    const r = responseDb();
+    g2.beginPath();
+    for (let i = 0; i < N_PTS; i++) { const x = xOf(G, freqs[i]), y = yDb(G, r[i]); i ? g2.lineTo(x, y) : g2.moveTo(x, y); }
+    g2.strokeStyle = col; g2.lineWidth = 3; g2.globalAlpha = state.bypass ? 0.35 : 1; g2.stroke(); g2.globalAlpha = 1;
+    // cutoff marker
+    const xc = xOf(G, state.freq); g2.strokeStyle = col; g2.lineWidth = 1.5; g2.setLineDash([2, 3]);
+    g2.beginPath(); g2.moveTo(xc, G.T); g2.lineTo(xc, G.T + G.ph); g2.stroke(); g2.setLineDash([]);
+    const yc = yDb(G, gainAt(state.freq)); g2.fillStyle = col; g2.beginPath(); g2.arc(xc, yc, 5, 0, Math.PI * 2); g2.fill();
+    g2.fillStyle = ink; g2.font = "bold 12px " + css("--font-body");
+    const lab = (state.type === "lowpass" || state.type === "highpass" ? "f꜀ " : "f₀ ") + fmtHz(state.freq);
+    g2.textAlign = xc > G.L + G.pw - 90 ? "right" : "left"; g2.fillText(lab, xc + (g2.textAlign === "left" ? 7 : -7), G.T + 14);
+    // sine marker
+    if (state.src === "sine") {
+      const xs = xOf(G, state.sineF); g2.strokeStyle = ink; g2.lineWidth = 2;
+      g2.beginPath(); g2.moveTo(xs, G.T + G.ph); g2.lineTo(xs, G.T + G.ph - 18); g2.stroke();
+      g2.fillStyle = ink; g2.textAlign = "center"; g2.font = "11px " + css("--font-body"); g2.fillText("사인파", xs, G.T + G.ph - 22);
+    }
+    // hover
+    if (hoverF) {
+      const xh = xOf(G, hoverF); g2.strokeStyle = ink; g2.globalAlpha = 0.4; g2.lineWidth = 1;
+      g2.beginPath(); g2.moveTo(xh, G.T); g2.lineTo(xh, G.T + G.ph); g2.stroke(); g2.globalAlpha = 1;
+    }
+  }
+  function updateReadout() {
+    if (!hoverF) { $("readout").textContent = "그래프 위에 마우스를 올려 보세요"; return; }
+    const g = gainAt(hoverF);
+    $("readout").textContent = `${fmtHz(hoverF)} · 필터 이득 ${g.toFixed(1)} dB (×${Math.pow(10, g / 20).toFixed(3)})`;
+  }
+  cv.addEventListener("pointermove", (e) => {
+    const G = geom(), rect = cv.getBoundingClientRect(), x = e.clientX - rect.left;
+    hoverF = (x >= G.L && x <= G.L + G.pw) ? fOf(G, x) : null; updateReadout(); if (!state.playing) draw();
+  });
+  cv.addEventListener("pointerleave", () => { hoverF = null; updateReadout(); if (!state.playing) draw(); });
+
+  let raf = 0;
+  function loop() {
+    cancelAnimationFrame(raf);
+    const tick = () => {
+      if (!state.playing) { draw(); return; }
+      if (!specIn || specIn.length !== inAn.frequencyBinCount) { specIn = new Float32Array(inAn.frequencyBinCount); specOut = new Float32Array(outAn.frequencyBinCount); }
+      inAn.getFloatFrequencyData(specIn); outAn.getFloatFrequencyData(specOut);
+      // output analyser sits after the volume control; undo it so both spectra share a reference
+      const corr = state.vol > 0.001 ? -20 * Math.log10(state.vol) : 0;
+      for (let i = 0; i < specOut.length; i++) specOut[i] += corr;
+      draw(); raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+  }
+  window.addEventListener("resize", () => draw());
+  if (window.matchMedia) window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", () => draw());
+  new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  render();
+  loadLibrary();
+})();
+</script>
+</body>
+</html>

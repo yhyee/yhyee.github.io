@@ -1,0 +1,41 @@
+{
+  "title": "수업 음원",
+  "sounds": [
+    {
+      "title": "1 kHz 삐 소리가 섞인 음악",
+      "file": "sounds/beep_1khz.mp3",
+      "note": "대역저지 필터로 1 kHz만 지웁니다. 원음 비교 버튼으로 삐 소리가 사라지는지 들어 보세요.",
+      "preset": { "type": "notch", "freq": 1000, "q": 4, "order": 2, "stages": 1 }
+    },
+    {
+      "title": "쉬익 잡음이 섞인 멜로디",
+      "file": "sounds/hiss_melody.mp3",
+      "note": "고주파 잡음(3.5 kHz 이상)을 저역통과 필터로 줄입니다. 차수와 단 수를 바꿔 잡음이 얼마나 줄어드는지 비교해 보세요.",
+      "preset": { "type": "lowpass", "freq": 2000, "q": 0.707, "order": 2, "stages": 2 }
+    },
+    {
+      "title": "웅웅거리는 저음이 섞인 멜로디",
+      "file": "sounds/rumble_melody.mp3",
+      "note": "100 Hz 아래의 웅웅거림을 고역통과 필터로 없앱니다. 저음은 이어폰이나 외부 스피커로 들어야 잘 들립니다.",
+      "preset": { "type": "highpass", "freq": 200, "q": 0.707, "order": 2, "stages": 2 }
+    },
+    {
+      "title": "60 Hz 전원 험이 섞인 음악",
+      "file": "sounds/hum_60hz.mp3",
+      "note": "우리나라 전원 주파수 60 Hz의 험을 노치 필터로 제거합니다. 노트북 스피커로는 잘 안 들리니 이어폰을 쓰세요.",
+      "preset": { "type": "notch", "freq": 60, "q": 3, "order": 2, "stages": 1 }
+    },
+    {
+      "title": "세 음 (250 Hz · 1 kHz · 4 kHz)",
+      "file": "sounds/three_tones.mp3",
+      "note": "대역통과 필터로 1 kHz만 골라 듣습니다. 중심주파수를 250 Hz나 4 kHz로 옮기면 라디오 채널을 바꾸듯 다른 음이 들립니다.",
+      "preset": { "type": "bandpass", "freq": 1000, "q": 5, "order": 2, "stages": 2 }
+    },
+    {
+      "title": "주파수 스윕 (20 Hz → 20 kHz, 12초)",
+      "file": "sounds/sweep_20_20k.mp3",
+      "note": "1차 RC 저역통과(1,592 Hz)를 걸고 들으면 차단주파수를 지나면서 소리가 점점 작아집니다. 높은 소리가 귀에 거슬리면 음량을 줄이세요.",
+      "preset": { "type": "lowpass", "freq": 1592, "q": 0.707, "order": 1, "stages": 1 }
+    }
+  ]
+}
