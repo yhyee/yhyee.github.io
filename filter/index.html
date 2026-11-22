@@ -66,10 +66,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .types button small { color: var(--muted); }
 .types button[aria-pressed="true"] { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 12%, var(--surface)); }
 .types button[aria-pressed="true"] b { color: var(--tc); }
-.ctl { display: grid; grid-template-columns: 110px minmax(0, 1fr) 110px; gap: 10px; align-items: center; }
-@media (max-width: 520px) { .ctl { grid-template-columns: 90px minmax(0, 1fr) 92px; } }
+.ctl { display: grid; grid-template-columns: 110px minmax(0, 1fr) 150px; gap: 10px; align-items: center; }
+@media (max-width: 520px) { .ctl { grid-template-columns: 90px minmax(0, 1fr) 120px; } .ctl .sine-num input { width: 84px; } }
 .ctl label { font-weight: 700; font-size: 14px; }
 .ctl output { font-variant-numeric: tabular-nums; text-align: right; font-weight: 700; }
+.ctl .sine-num { justify-content: flex-end; }
+.ctl .sine-num input { width: 104px; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 .seg { display: flex; flex-wrap: wrap; gap: 6px; }
 .seg button { padding: 6px 12px; }
@@ -80,7 +82,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .sources button { text-align: left; display: grid; padding: 10px 12px; }
 .sources button small { color: var(--muted); }
 .sources button[aria-pressed="true"] { border: 2px solid var(--accent); padding: 9px 11px; }
-#sineRow[hidden] { display: none; }
+.sinebox { border: 2px solid var(--accent); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.sinebox[hidden] { display: none; }
+.sine-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.sine-main > label { font-weight: 700; }
+.sine-main input[type="range"] { height: 28px; }
+.sine-num { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.sine-num input { font: inherit; font-weight: 700; width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.sine-scale { grid-column: 2; position: relative; height: 16px; margin: -10px 8px 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sine-scale span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.sine-scale span:first-child { transform: none; }
+.sine-scale span:last-child { transform: translateX(-100%); }
+.sine-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sine-quick button { padding: 4px 10px; font-size: 13px; border-radius: 999px; }
+@media (max-width: 600px) { .sine-main { grid-template-columns: 1fr; } .sine-main > input[type="range"] { order: 1; } .sine-scale { grid-column: 1; margin-top: -8px; order: 2; } .sine-scale span:nth-child(4) { display: none; } .sine-main > .sine-num { order: 3; } .sine-main > .sine-num input { width: 100%; } }
 .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; color: var(--muted); }
 .drop.over { border-color: var(--accent); color: var(--ink); }
 .drop input { font: inherit; font-size: 13px; max-width: 100%; }
@@ -117,6 +132,30 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
         <span class="status" id="status">재생 버튼을 누르면 소리가 납니다. 아이폰·아이패드는 무음 스위치를 꺼 주세요.</span>
       </div>
 
+      <div class="sinebox" id="sineBox" hidden>
+        <div class="sine-main">
+          <label for="sineF">사인파 주파수</label>
+          <input id="sineF" type="range" min="0" max="2000" step="1">
+          <div class="sine-num">
+            <input id="sineNum" type="number" min="20" max="20000" step="1" inputmode="numeric" aria-label="사인파 주파수 직접 입력 (Hz)">
+            <span>Hz</span>
+          </div>
+          <div class="sine-scale" aria-hidden="true"><span style="left:0.0%">20 Hz</span><span style="left:23.3%">100</span><span style="left:56.6%">1 kHz</span><span style="left:79.9%">5 kHz</span><span style="left:100.0%">20 kHz</span></div>
+        </div>
+        <div class="sine-quick" role="group" aria-label="사인파 주파수 바로 가기">
+          <span class="hint">바로 가기:</span>
+          <button type="button" data-sf="60">60 Hz</button>
+          <button type="button" data-sf="250">250 Hz</button>
+          <button type="button" data-sf="1000">1 kHz</button>
+          <button type="button" data-sf="fc">차단·중심주파수와 같게</button>
+          <button type="button" data-sf="4000">4 kHz</button>
+          <button type="button" data-sf="10000">10 kHz</button>
+          <button type="button" data-sf="-" title="반음 아래">◀ 조금 낮게</button>
+          <button type="button" data-sf="+" title="반음 위">조금 높게 ▶</button>
+        </div>
+        <p class="hint" id="sineHint">숫자를 입력하고 Enter를 누르면 적용됩니다(20~20,000 Hz). 차단주파수 칸도 같은 방식으로 입력할 수 있습니다. 노트북 스피커는 약 100 Hz 아래가 거의 들리지 않고, 사람 귀도 15 kHz 위는 잘 듣지 못합니다(나이에 따라 다름). 양 끝에서 소리가 안 들리면 스피커나 귀의 한계일 수 있으니 그래프의 출력 스펙트럼으로 확인하세요. 높은 주파수는 음량을 낮춰 시작하세요.</p>
+      </div>
+
       <div class="plot-wrap">
         <canvas id="plot" aria-label="필터 주파수 응답과 실시간 스펙트럼 그래프" role="img"></canvas>
         <div class="readout" id="readout">그래프 위에 마우스를 올려 보세요</div>
@@ -137,8 +176,11 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
 
       <div class="ctl">
         <label for="freq" id="freqLabel">차단주파수</label>
-        <input id="freq" type="range" min="0" max="1000" step="1">
-        <output id="freqOut" for="freq"></output>
+        <input id="freq" type="range" min="0" max="2000" step="1">
+        <div class="sine-num">
+          <input id="freqNum" type="number" min="20" max="20000" step="1" inputmode="numeric" aria-label="차단주파수 또는 중심주파수 직접 입력 (Hz)" title="숫자를 입력하고 Enter">
+          <span>Hz</span>
+        </div>
       </div>
       <div class="ctl">
         <label>필터 차수</label>
@@ -168,7 +210,7 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
         <output id="volOut" for="vol">60%</output>
       </div>
       <p class="hint" id="orderHint"></p>
-      <p class="keys">단축키: <kbd>Space</kbd> 재생/정지 · <kbd>B</kbd> 원음 비교 · <kbd>1</kbd>~<kbd>4</kbd> 필터 종류 · <kbd>R</kbd> 1차/2차 전환</p>
+      <p class="keys">단축키: <kbd>Space</kbd> 재생/정지 · <kbd>B</kbd> 원음 비교 · <kbd>1</kbd>~<kbd>4</kbd> 필터 종류 · <kbd>R</kbd> 1차/2차 전환 · 숫자 칸은 입력 후 <kbd>Enter</kbd></p>
     </main>
 
     <aside class="panel" aria-label="음원, 예시, 설명">
@@ -179,12 +221,6 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
         <button type="button" data-src="sine" aria-pressed="false"><b>사인파 (단일 주파수)</b><small>20 Hz ~ 20 kHz 한 주파수만 · 통과/차단을 소리 크기로 확인</small></button>
         <button type="button" data-src="file" aria-pressed="false"><b>내 음원 파일</b><small id="fileName">아래에서 MP3·WAV 파일을 고르세요</small></button>
       </div>
-      <div class="ctl" id="sineRow" hidden>
-        <label for="sineF">사인파</label>
-        <input id="sineF" type="range" min="0" max="1000" step="1">
-        <output id="sineOut" for="sineF"></output>
-      </div>
-      <p class="hint" id="sineHint" hidden>노트북 스피커는 약 100 Hz 아래가 거의 들리지 않고, 사람 귀도 15 kHz 위는 잘 듣지 못합니다(나이에 따라 다름). 양 끝 주파수에서 소리가 안 들리면 필터가 아니라 스피커나 귀의 한계일 수 있으니, 그래프의 출력 스펙트럼으로 확인하세요. 높은 주파수는 귀에 거슬릴 수 있으니 음량을 낮춰 시작하세요.</p>
       <div class="drop" id="drop">
         <label for="fileIn">음원 파일 (여기에 끌어다 놓아도 됩니다) · 파일은 이 브라우저 안에서만 쓰이고 어디에도 올라가지 않습니다</label><br>
         <input id="fileIn" type="file" accept="audio/*">
@@ -525,9 +561,25 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
     if (ctx) rebuildChain(); render();
   }
   document.querySelectorAll("#order button").forEach((b) => b.addEventListener("click", () => setOrder(+b.dataset.o)));
-  $("freq").addEventListener("input", (e) => { state.freq = logMap(+e.target.value, F_LO, F_HI); applyParams(); render(); });
+  const hzText = (f) => f < 100 ? f.toFixed(1).replace(/\.0$/, "") : String(Math.round(f));
+  const setFreq = (f) => { if (!isFinite(f)) return; state.freq = Math.min(F_HI, Math.max(F_LO, f)); applyParams(); render(); };
+  $("freq").addEventListener("input", (e) => setFreq(logMap(+e.target.value * 0.5, F_LO, F_HI)));
+  const commitFreq = (el) => { setFreq(parseFloat(el.value)); el.value = hzText(state.freq); };
+  $("freqNum").addEventListener("change", (e) => commitFreq(e.target));
+  $("freqNum").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commitFreq(e.target); e.target.select(); } });
+  $("freqNum").addEventListener("blur", () => render());
   $("q").addEventListener("input", (e) => { state.q = logMap(+e.target.value, Q_LO, Q_HI); applyParams(); render(); });
-  $("sineF").addEventListener("input", (e) => { state.sineF = logMap(+e.target.value, S_LO, S_HI); applyParams(); render(); });
+  const setSine = (f) => { if (!isFinite(f)) return; state.sineF = Math.min(S_HI, Math.max(S_LO, f)); applyParams(); render(); };
+  $("sineF").addEventListener("input", (e) => setSine(logMap(+e.target.value * 0.5, S_LO, S_HI)));
+  const sineNumText = () => state.sineF < 100 ? state.sineF.toFixed(1).replace(/\.0$/, "") : String(Math.round(state.sineF));
+  const commitNum = (el) => { setSine(parseFloat(el.value)); el.value = sineNumText(); };
+  $("sineNum").addEventListener("change", (e) => commitNum(e.target));
+  $("sineNum").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commitNum(e.target); e.target.select(); } });
+  $("sineNum").addEventListener("blur", () => render());
+  document.querySelectorAll(".sine-quick button").forEach((b) => b.addEventListener("click", () => {
+    const v = b.dataset.sf;
+    setSine(v === "fc" ? state.freq : v === "+" ? state.sineF * Math.pow(2, 1 / 12) : v === "-" ? state.sineF / Math.pow(2, 1 / 12) : +v);
+  }));
   $("vol").addEventListener("input", (e) => { state.vol = +e.target.value / 100; applyParams(); render(); });
   $("playBtn").addEventListener("click", () => state.playing ? stop() : play());
   $("bypassBtn").addEventListener("click", () => { state.bypass = !state.bypass; applyParams(); render(); });
@@ -568,11 +620,13 @@ kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bott
     document.querySelectorAll(".sources button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.src === state.src)));
     document.querySelectorAll("#lib button").forEach((b) => b.setAttribute("aria-pressed", String(state.src === "lib" && +b.dataset.i === libCur)));
     document.querySelectorAll("#stages button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.n === state.stages)));
-    $("freq").value = logInv(state.freq, F_LO, F_HI); $("freqOut").textContent = fmtHz(state.freq); $("freqLabel").textContent = T.fLabel;
+    $("freq").value = Math.round(2000 * Math.log(state.freq / F_LO) / Math.log(F_HI / F_LO));
+    if (document.activeElement !== $("freqNum")) $("freqNum").value = hzText(state.freq); $("freqLabel").textContent = T.fLabel;
     $("q").value = logInv(state.q, Q_LO, Q_HI); $("qOut").textContent = state.q.toFixed(state.q < 10 ? 2 : 1);
-    $("sineF").value = logInv(state.sineF, S_LO, S_HI); $("sineOut").textContent = fmtHz(state.sineF);
+    $("sineF").value = Math.round(2000 * Math.log(state.sineF / S_LO) / Math.log(S_HI / S_LO));
+    if (document.activeElement !== $("sineNum")) $("sineNum").value = sineNumText();
     $("volOut").textContent = Math.round(state.vol * 100) + "%"; $("vol").value = Math.round(state.vol * 100);
-    $("sineRow").hidden = state.src !== "sine"; $("sineHint").hidden = state.src !== "sine";
+    $("sineBox").hidden = state.src !== "sine";
     const lh = isLH(), rc = isRC();
     document.querySelectorAll("#order button").forEach((b) => { b.setAttribute("aria-pressed", String(+b.dataset.o === state.order)); b.disabled = +b.dataset.o === 1 && !lh; });
     $("q").disabled = rc; if (rc) $("qOut").textContent = "—";
